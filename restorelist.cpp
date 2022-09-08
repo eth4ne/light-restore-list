@@ -36,19 +36,20 @@ int block_end = 1000000;
 std::string output_restore = "restore.json";
 int log_period = 10000;
 
+int cnt_restore = 0;
+int cnt_inactivated = 0;
+
 void update_account (int address, int blocknumber, int type) {
   if (type == 0) {
     if (cache_account.contains(address) && cache_account[address] < 0) {
-      //if (restore.contains(blocknumber)) {
-        restore[blocknumber].push_back(address);
-      //} else {
-        //restore[blocknumber] = std::vector<int>{address};
-      //}
+      restore[blocknumber].push_back(address);
+      cnt_restore++;
       cache_account[address] = blocknumber;
     }
   } else if (type == 1) {
     if (cache_account.contains(address) && cache_account[address] < 0) {
       restore[blocknumber].push_back(address);
+      cnt_restore++;
     }
     cache_account[address] = blocknumber;
   }
@@ -114,6 +115,7 @@ int run(int from, int to) {
             for (auto const& l : cache_block[block_removal]) {
               if (cache_account[l] == block_removal) {
                 cache_account[l] = -block_removal;
+                cnt_inactivated++;
               }
             }
             cache_block.erase(block_removal);
@@ -122,7 +124,9 @@ int run(int from, int to) {
       }
       if ((i+k) % log_period == 0) {
         int ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-        std::cout<<"Blk height: "<<i+k<<", Blkn: "<<cnt_block<<"("<<std::fixed<<std::setprecision(2)<<(cnt_block*1000.0/ms)<<"/s), Staten: "<<cnt_state<<"("<<std::fixed<<std::setprecision(2)<<(cnt_state*1000.0/ms)<<"/s), Time: "<<ms<<"ms"<<std::endl;
+        std::cout<<"Blk height: "<<i+k<<std::endl;
+        std::cout<<" Blkn: "<<cnt_block<<"("<<std::fixed<<std::setprecision(2)<<(cnt_block*1000.0/ms)<<"/s), Staten: "<<cnt_state<<"("<<std::fixed<<std::setprecision(2)<<(cnt_state*1000.0/ms)<<"/s) in "<<ms<<"ms"<<std::endl;
+        std::cout<<" Total restore: "<<cnt_restore<<"accs, total inactivated: "<<cnt_inactivated<<"accs"<<std::endl;
       }
     }
     cnt_block = std::min(cnt_block+batch_size, to);
