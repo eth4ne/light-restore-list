@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <unordered_map>
+#include <queue>
 #include <chrono>
 #include <iomanip>
 #include <array>
@@ -24,10 +26,10 @@ class state {
 };
 
 std::map< int, std::vector< int > > restore;
-std::map< int, int > cache_account;
-std::map< int, std::vector< int > > cache_block;
+std::unordered_map< int, int > cache_account;
+std::queue< std::vector< int > > cache_block;
 
-std::map< int, std::array< uint8_t, 20 > > addresses;
+std::unordered_map< int, std::array< uint8_t, 20 > > addresses;
 
 int epoch_inactivate_every = 100000;
 int epoch_inactivate_older_than = 100000;
@@ -67,6 +69,8 @@ int run(int from, int to) {
   sql::Properties properties({{"user", db_user}, {"password", db_pass}});
   std::unique_ptr<sql::Connection> conn(driver->connect(url, properties));
 
+  sql::ResultSet *query;
+
   if (!conn) {
     std::cout<<"DB connection failed"<<std::endl;
     return 1;
@@ -79,18 +83,22 @@ int run(int from, int to) {
     stmnt->setInt(1, i);
     stmnt->setInt(2, std::min(i+batch_size, to+1));
 
-    std::vector< std::vector<state> > result;
     //std::fill(result.begin(), result.end(), std::vector<state>());
+    std::vector< std::vector< state > > result;
+
+    result.reserve(batch_size);
     for (int j = 0; j < batch_size; ++j) result.push_back(std::vector<state>());
 
-    sql::ResultSet *query = stmnt->executeQuery();
+    query = stmnt->executeQuery();
+
     while (query->next()) {
       result[query->getInt(2)-i].push_back(state(query->getInt(1), query->getInt(2), query->getInt(3)));
     }
     delete query;
 
     for (int k = 0; k < batch_size; ++k) {
-      cache_block[i+k] = std::vector< int > ();
+      cache_block.push(std::vector< int > ());
+      cache_block.back().reserve(result[k].size());
       for (auto const& j : result[k]) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
@@ -99,34 +107,34 @@ int run(int from, int to) {
           } else {
             update_account(j.address_id, i+k, 1);
           }
-          cache_block[i+k].push_back(j.address_id);
+          cache_block.back().push_back(j.address_id);
           cnt_state++;
         } catch (int err) {
           std::cout<<"Error blk #"<<j.blocknumber<<std::endl;
         }
       }
 
-      //cache_block[i+k] = cache_block_tmp;
 
       if ((i+k + 1 - from) % epoch_inactivate_every == 0) {
-        for (int j = 0; j < epoch_inactivate_every; ++j) {
+        for (int j = epoch_inactivate_every-1; j >= 0; --j) {
           int block_removal = i+k - j - epoch_inactivate_older_than;
-          if (cache_block.contains(block_removal)) {
-            for (auto const& l : cache_block[block_removal]) {
+          if (block_removal >= 0) {
+            for (auto const& l : cache_block.front()) {
               if (cache_account[l] == block_removal) {
                 cache_account[l] = -block_removal;
                 cnt_inactivated++;
               }
             }
-            cache_block.erase(block_removal);
+            cache_block.pop();
           }
         }
       }
       if ((i+k) % log_period == 0) {
-        int ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+        int ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+        std::cout<<"========================================"<<std::endl;
         std::cout<<"Blk height: "<<i+k<<std::endl;
-        std::cout<<" Blkn: "<<cnt_block<<"("<<std::fixed<<std::setprecision(2)<<(cnt_block*1000.0/ms)<<"/s), Staten: "<<cnt_state<<"("<<std::fixed<<std::setprecision(2)<<(cnt_state*1000.0/ms)<<"/s) in "<<ms<<"ms"<<std::endl;
-        std::cout<<" Total restore: "<<cnt_restore<<"accs, total inactivated: "<<cnt_inactivated<<"accs"<<std::endl;
+        std::cout<<"  Blkn: "<<cnt_block<<"("<<std::fixed<<std::setprecision(2)<<(cnt_block*1000.0/ms)<<"/s), Staten: "<<cnt_state<<"("<<std::fixed<<std::setprecision(2)<<(cnt_state*1000.0/ms)<<"/s) in "<<ms<<"ms"<<std::endl;
+        std::cout<<"  Total restore: "<<cnt_restore<<"accs, total inactivated: "<<cnt_inactivated<<"accs"<<std::endl;
       }
     }
     cnt_block = std::min(cnt_block+batch_size, to);
@@ -136,7 +144,7 @@ int run(int from, int to) {
   std::cout<<"Processing restore list"<<std::endl;
 
   std::unique_ptr<sql::Statement> stmnt(conn->createStatement());
-  sql::ResultSet *query = stmnt->executeQuery("SELECT COUNT(*) FROM `addresses`;");
+  query = stmnt->executeQuery("SELECT COUNT(*) FROM `addresses`;");
   query->next();
   int address_cnt = query->getInt(1);
   address_cnt = std::min(address_cnt, max_id);
