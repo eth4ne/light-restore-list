@@ -10,7 +10,7 @@ $ sudo apt install build-essentials libmariadb3 libmariadb-dev
 ```
 $ sudo install libmariadbcpp.so /usr/lib64
 ```
-* Add location of MariaDB library to environment variable ```LD_LIBRARY_PATH```.
+* Add location of MariaDB library to the environment variable ```LD_LIBRARY_PATH```.
 ```
 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64
 ```
@@ -27,4 +27,4 @@ $ make restorelist
 * <pre>-i <i>N</i></pre>: Run inactivation every N blocks (default: 100000)
 * <pre>-t <i>N</i></pre>: Inactivate addresses older than N blocks (default: 100000)
 * <pre>-o <i>filename</i></pre>: Set output file name (default: restore.json)
-* <pre>-l <i>N/i></pre>: Print log every N blocks (default: 10000)
+* <pre>-l <i>N</i></pre>: Print log every N blocks (default: 10000)
