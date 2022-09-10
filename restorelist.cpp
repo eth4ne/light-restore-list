@@ -109,7 +109,6 @@ int run(int from, int to) {
         }
       }
 
-
       if ((i+k + 1 - from) % epoch_inactivate_every == 0) {
         for (int j = epoch_inactivate_every-1; j >= 0; --j) {
           int block_removal = i+k - j - epoch_inactivate_older_than;
@@ -129,7 +128,7 @@ int run(int from, int to) {
         std::cout<<"========================================"<<std::endl;
         std::cout<<"Blk height: "<<i+k<<std::endl;
         std::cout<<"  Blkn: "<<cnt_block<<"("<<std::fixed<<std::setprecision(2)<<(cnt_block*1000.0/ms)<<"/s), Staten: "<<cnt_state<<"("<<std::fixed<<std::setprecision(2)<<(cnt_state*1000.0/ms)<<"/s) in "<<ms<<"ms"<<std::endl;
-        std::cout<<"  Total restore: "<<cnt_restore<<"accs, total inactivated: "<<cnt_inactivated<<"accs"<<std::endl;
+        std::cout<<"  Inactivated "<<cnt_inactivated<<"accs, Restored: "<<cnt_restore<<"accs, Unique: "<<cache_account.size()<<"accs"<<std::endl;
       }
     }
     cnt_block = std::min(cnt_block+batch_size, to);
