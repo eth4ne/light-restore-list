@@ -3,9 +3,13 @@
 ### Prerequisites
 * Install dependencies
 ```
-$ sudo apt install build-essentials libmariadb3 libmariadb-dev
+$ sudo apt install build-essentials
 ```
-* [Install MariaDB C++ connector](https://github.com/mariadb-corporation/mariadb-connector-cpp/blob/master/BUILD.md)
+* Install MariaDB C connector.
+```
+$ sudo apt install libmariadb3 libmariadb-dev
+```
+* Install MariaDB C++ connector. You may downloada a [prebuilt binary](https://mariadb.com/downloads/connectors/connectors-data-access/cpp-connector), or [build yourself.](https://github.com/mariadb-corporation/mariadb-connector-cpp/blob/master/BUILD.md)
 * Install MariaDB library.
 ```
 $ sudo install libmariadbcpp.so /usr/lib64
@@ -22,9 +26,9 @@ $ make restorelist
 ```
 
 ### Command line options
-* <pre>-s <i>N</i></pre>: Block height to start with (inclusive) (default: 0)
-* <pre>-e <i>N</i></pre>: Block height to end (inclusive) (default: 1000000)
-* <pre>-i <i>N</i></pre>: Run inactivation every N blocks (default: 100000)
-* <pre>-t <i>N</i></pre>: Inactivate addresses older than N blocks (default: 100000)
-* <pre>-o <i>filename</i></pre>: Set output file name (default: restore.json)
-* <pre>-l <i>N</i></pre>: Print log every N blocks (default: 10000)
+* <code>-s <i>N</i></code>: Block height to start with (inclusive) (default: 0)
+* <code>-e <i>N</i></code>: Block height to end (inclusive) (default: 1000000)
+* <code>-i <i>N</i></code>: Run inactivation every N blocks (default: 100000)
+* <code>-t <i>N</i></code>: Inactivate addresses older than N blocks (default: 100000)
+* <code>-o <i>filename</i></code>: Set output file name (default: restore.json)
+* <code>-l <i>N</i></code>: Print log every N blocks (default: 10000)
