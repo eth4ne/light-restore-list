@@ -83,7 +83,6 @@ int run(int from, int to) {
     stmnt->setInt(1, i);
     stmnt->setInt(2, std::min(i+batch_size, to+1));
 
-    //std::fill(result.begin(), result.end(), std::vector<state>());
     std::vector< std::vector< state > > result;
 
     result.reserve(batch_size);
@@ -102,11 +101,7 @@ int run(int from, int to) {
       for (auto const& j : result[k]) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
-          if (j.type % 2 == 0) {
-            update_account(j.address_id, i+k, 0);
-          } else {
-            update_account(j.address_id, i+k, 1);
-          }
+          update_account(j.address_id, i+k, j.type % 2);
           cache_block.back().push_back(j.address_id);
           cnt_state++;
         } catch (int err) {
