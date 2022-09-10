@@ -135,7 +135,10 @@ int run(int from, int to) {
   }
 
   cache_account.clear();
-  std::cout<<"Processing restore list"<<std::endl;
+
+  int ms;
+  ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+  std::cout<<"Processing restore list ("<<ms<<"ms)"<<std::endl;
 
   std::unique_ptr<sql::Statement> stmnt(conn->createStatement());
   query = stmnt->executeQuery("SELECT COUNT(*) FROM `addresses`;");
@@ -158,6 +161,8 @@ int run(int from, int to) {
     }
     delete query;
   }
+  ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+  std::cout<<"Writing output ("<<ms<<"ms)"<<std::endl;
 
   std::ofstream output_file;
   output_file.open(output_restore);
@@ -189,8 +194,9 @@ int run(int from, int to) {
   conn->close();
   output_file.close();
 
+  ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+  std::cout<<"Saved result as "<<output_restore<<" ("<<ms<<"ms)"<<std::endl;
 
-  std::cout<<"Saved result as "<<output_restore<<std::endl;
   return 0;
 }
 
