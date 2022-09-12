@@ -26,11 +26,11 @@ class state {
   state(int address_id, int blocknumber, int8_t type): address_id(address_id), blocknumber(blocknumber), type(type){};
 };
 
-std::map< int, std::vector< int > > restore;
-std::unordered_map< int, int > cache_account;
+std::map<int, std::vector<int> > restore;
+std::unordered_map<int, int> cache_account;
 std::queue<std::set<int> > cache_block;
 
-std::unordered_map< int, std::array< uint8_t, 20 > > addresses;
+std::unordered_map<int, std::array<uint8_t, 20> > addresses;
 
 int epoch_inactivate_every = 100000;
 int epoch_inactivate_older_than = 100000;
@@ -84,7 +84,7 @@ int run(int from, int to) {
     stmnt->setInt(1, i);
     stmnt->setInt(2, std::min(i+batch_size, to+1));
 
-    std::vector< std::vector< state > > result;
+    std::vector<std::vector<state> > result;
 
     result.reserve(batch_size);
     for (int j = 0; j < batch_size; ++j) result.push_back(std::vector<state>());
@@ -124,7 +124,7 @@ int run(int from, int to) {
         }
       }
       if ((i+k) % log_period == 0) {
-        int ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+        int ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
         std::cout<<"========================================"<<std::endl;
         std::cout<<"Blk height: "<<i+k<<std::endl;
         std::cout<<"  Blkn: "<<cnt_block<<"("<<std::fixed<<std::setprecision(2)<<(cnt_block*1000.0/ms)<<"/s), Staten: "<<cnt_state<<"("<<std::fixed<<std::setprecision(2)<<(cnt_state*1000.0/ms)<<"/s) in "<<ms<<"ms"<<std::endl;
@@ -135,9 +135,10 @@ int run(int from, int to) {
   }
 
   cache_account.clear();
+  std::queue<std::set<int> >().swap(cache_block);
 
   int ms;
-  ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+  ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   std::cout<<"Processing restore list ("<<ms<<"ms)"<<std::endl;
 
   std::unique_ptr<sql::Statement> stmnt(conn->createStatement());
@@ -161,7 +162,7 @@ int run(int from, int to) {
     }
     delete query;
   }
-  ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+  ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   std::cout<<"Writing output ("<<ms<<"ms)"<<std::endl;
 
   std::ofstream output_file;
@@ -194,7 +195,7 @@ int run(int from, int to) {
   conn->close();
   output_file.close();
 
-  ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start).count();
+  ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   std::cout<<"Saved result as "<<output_restore<<" ("<<ms<<"ms)"<<std::endl;
 
   return 0;
