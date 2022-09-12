@@ -6,6 +6,7 @@
 #include <map>
 #include <unordered_map>
 #include <queue>
+#include <set>
 #include <chrono>
 #include <iomanip>
 #include <array>
@@ -27,7 +28,7 @@ class state {
 
 std::map< int, std::vector< int > > restore;
 std::unordered_map< int, int > cache_account;
-std::queue< std::vector< int > > cache_block;
+std::queue<std::set<int> > cache_block;
 
 std::unordered_map< int, std::array< uint8_t, 20 > > addresses;
 
@@ -96,13 +97,12 @@ int run(int from, int to) {
     delete query;
 
     for (int k = 0; k < batch_size; ++k) {
-      cache_block.push(std::vector< int > ());
-      cache_block.back().reserve(result[k].size());
+      cache_block.push(std::set<int>());
       for (auto const& j : result[k]) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
           update_account(j.address_id, i+k, j.type % 2);
-          cache_block.back().push_back(j.address_id);
+          cache_block.back().insert(j.address_id);
           cnt_state++;
         } catch (int err) {
           std::cout<<"Error blk #"<<j.blocknumber<<std::endl;
