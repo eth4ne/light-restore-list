@@ -14,7 +14,7 @@ $ sudo apt install libmariadb3 libmariadb-dev
 ```
 $ sudo install libmariadbcpp.so /usr/lib64
 ```
-* Make sure the location of MariaDB library is added to the environment variable ```$LD_LIBRARY_PATH```.
+* Make sure the location of MariaDB library is added to the environment variable ```$LD_LIBRARY_PATH```. The command below may be executed every time when logging in, or added to your shell profile(```~/.profile```).
 ```
 $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64
 ```
