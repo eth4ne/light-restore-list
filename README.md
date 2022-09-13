@@ -9,7 +9,7 @@ $ sudo apt install build-essentials
 ```
 $ sudo apt install libmariadb3 libmariadb-dev
 ```
-* Install MariaDB C++ connector. You may downloada a [prebuilt binary](https://mariadb.com/downloads/connectors/connectors-data-access/cpp-connector), or [build yourself.](https://github.com/mariadb-corporation/mariadb-connector-cpp/blob/master/BUILD.md)
+* Install MariaDB C++ connector. You may download a [prebuilt binary](https://mariadb.com/downloads/connectors/connectors-data-access/cpp-connector), or [build yourself.](https://github.com/mariadb-corporation/mariadb-connector-cpp/blob/master/BUILD.md)
 * Install MariaDB library.
 ```
 $ sudo install libmariadbcpp.so /usr/lib64
