@@ -5,7 +5,6 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
-#include <queue>
 #include <set>
 #include <chrono>
 #include <iomanip>
@@ -28,7 +27,7 @@ class state {
 
 std::map<int, std::vector<int> > restore;
 std::unordered_map<int, int> cache_account;
-std::queue<std::set<int> > cache_block;
+std::map<int, std::set<int> > cache_block;
 
 std::unordered_map<int, std::array<uint8_t, 20> > addresses;
 
@@ -97,12 +96,16 @@ int run(int from, int to) {
     delete query;
 
     for (int k = 0; k < batch_size; ++k) {
-      cache_block.push(std::set<int>());
+      cache_block[i+k] = std::set<int>();
       for (auto const& j : result[k]) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
+          if (cache_account.contains(j.address_id)) {
+            int height_positive = cache_account[j.address_id] >= 0 ? cache_account[j.address_id] : -cache_account[j.address_id];
+            cache_block[height_positive].erase(j.address_id);
+          }
           update_account(j.address_id, i+k, j.type % 2);
-          cache_block.back().insert(j.address_id);
+          cache_block[i+k].insert(j.address_id);
           cnt_state++;
         } catch (int err) {
           std::cout<<"Error blk #"<<j.blocknumber<<std::endl;
@@ -113,13 +116,13 @@ int run(int from, int to) {
         for (int j = epoch_inactivate_every-1; j >= 0; --j) {
           int block_removal = i+k - j - epoch_inactivate_older_than;
           if (block_removal >= 0) {
-            for (auto const& l : cache_block.front()) {
+            for (auto const& l : cache_block[block_removal]) {
               if (cache_account[l] == block_removal) {
                 cache_account[l] = -block_removal;
                 cnt_inactivated++;
               }
             }
-            cache_block.pop();
+            cache_block.erase(block_removal);
           }
         }
       }
@@ -135,20 +138,23 @@ int run(int from, int to) {
   }
 
   cache_account.clear();
-  std::queue<std::set<int> >().swap(cache_block);
+  std::map<int, std::set<int> >().swap(cache_block);
 
   int ms;
   ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   std::cout<<"Processing restore list ("<<ms<<"ms)"<<std::endl;
 
   std::unique_ptr<sql::Statement> stmnt(conn->createStatement());
-  query = stmnt->executeQuery("SELECT COUNT(*) FROM `addresses`;");
+  query = stmnt->executeQuery("SELECT MAX(`id`) FROM `addresses`;");
   query->next();
   int address_cnt = query->getInt(1);
   address_cnt = std::min(address_cnt, max_id);
   delete query;
 
   char tmp[20];
+
+  ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+  std::cout<<"Fetching addresses ("<<ms<<"ms)"<<std::endl;
 
   for (int i = 0; i < address_cnt; i+=batch_size_address) {
     std::unique_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement("SELECT `id`, `address` FROM `addresses` WHERE `id`>=? AND `id`<?;"));
@@ -158,6 +164,7 @@ int run(int from, int to) {
     while (query->next()) {
       std::istream *address = query->getBlob(2);
       address->read(tmp, 20);
+      delete address;
       std::copy(tmp, tmp+20, std::begin(addresses[query->getInt(1)]));
     }
     delete query;
