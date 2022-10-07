@@ -101,8 +101,8 @@ int run(int from, int to) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
           if (cache_account.contains(j.address_id)) {
-            int height_positive = cache_account[j.address_id] >= 0 ? cache_account[j.address_id] : -cache_account[j.address_id];
-            cache_block[height_positive].erase(j.address_id);
+            if (cache_account[j.address_id] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && cache_account[j.address_id] >= 0) {cache_block[cache_account[j.address_id]].erase(j.address_id);
+            }
           }
           update_account(j.address_id, i+k, j.type % 2);
           cache_block[i+k].insert(j.address_id);
@@ -112,12 +112,12 @@ int run(int from, int to) {
         }
       }
 
-      if ((i+k + 1 - from) % epoch_inactivate_every == 0) {
+      if ((i+k + 1 - from + epoch_inactivate_older_than) % epoch_inactivate_every == 0) {
         for (int j = epoch_inactivate_every-1; j >= 0; --j) {
           int block_removal = i+k - j - epoch_inactivate_older_than;
           if (block_removal >= 0) {
             for (auto const& l : cache_block[block_removal]) {
-              if (cache_account[l] == block_removal) {
+              if (cache_account[l] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && cache_account[l] < i+k - epoch_inactivate_older_than) {
                 cache_account[l] = -block_removal;
                 cnt_inactivated++;
               }
