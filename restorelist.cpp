@@ -105,7 +105,7 @@ int run(int from, int to) {
             }
           }
           update_account(j.address_id, i+k, j.type % 2);
-          cache_block[i+k].insert(j.address_id);
+          if (cache_account.contains(j.address_id)) cache_block[i+k].insert(j.address_id);
           cnt_state++;
         } catch (int err) {
           std::cout<<"Error blk #"<<j.blocknumber<<std::endl;
