@@ -30,26 +30,30 @@ std::unordered_map<int, int> cache_account;
 std::map<int, std::set<int> > cache_block;
 
 std::unordered_map<int, std::array<uint8_t, 20> > addresses;
+std::unordered_map<int, int > addresses_type;
 
 int epoch_inactivate_every = 100000;
 int epoch_inactivate_older_than = 100000;
 int block_start = 0;
 int block_end = 1000000;
 std::string output_restore = "restore.json";
+std::string output_address_type;
 int log_period = 10000;
 
 int cnt_restore = 0;
 int cnt_inactivated = 0;
 
+bool print_address_type = false;
+
 void update_account (int address, int blocknumber, int type) {
   if (type == 0) {
-    if (cache_account.contains(address) && cache_account[address] & 0x80000000) {
+    if (cache_account.contains(address) && (cache_account[address] & 0x80000000)) {
       restore[blocknumber].push_back(address);
       cnt_restore++;
       cache_account[address] = blocknumber;
     }
   } else if (type == 1) {
-    if (cache_account.contains(address) && cache_account[address] & 0x80000000) {
+    if (cache_account.contains(address) && (cache_account[address] & 0x80000000)) {
       restore[blocknumber].push_back(address);
       cnt_restore++;
     }
@@ -138,7 +142,6 @@ int run(int from, int to) {
     cnt_block = std::min(cnt_block+batch_size, to);
   }
 
-  cache_account.clear();
   std::map<int, std::set<int> >().swap(cache_block);
 
   int ms;
@@ -158,7 +161,7 @@ int run(int from, int to) {
   std::cout<<"Fetching addresses ("<<ms<<"ms)"<<std::endl;
 
   for (int i = 0; i < address_cnt; i+=batch_size_address) {
-    std::unique_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement("SELECT `id`, `address` FROM `addresses` WHERE `id`>=? AND `id`<?;"));
+    std::unique_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement("SELECT `id`, `address`, `_type` FROM `addresses` WHERE `id`>=? AND `id`<?;"));
     stmnt->setInt(1, i);
     stmnt->setInt(2, i+batch_size_address);
     sql::ResultSet *query = stmnt->executeQuery();
@@ -167,15 +170,66 @@ int run(int from, int to) {
       address->read(tmp, 20);
       delete address;
       std::copy(tmp, tmp+20, std::begin(addresses[query->getInt(1)]));
+      if (print_address_type) {
+        addresses_type[query->getInt(1)] = query->getInt(3);
+      }
     }
     delete query;
   }
-  ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
-  std::cout<<"Writing output ("<<ms<<"ms)"<<std::endl;
 
-  std::ofstream output_file;
+  std::ofstream output_file, output_file_address_type;
   output_file.open(output_restore);
   output_file<<"{"<<std::endl;
+
+  if (print_address_type) {
+    ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+    std::cout<<"Writing type output ("<<ms<<"ms)"<<std::endl;
+    output_file_address_type.open(output_address_type);
+    output_file_address_type<<"{"<<std::endl;
+    output_file_address_type<<"  \"inactive\": {"<<std::endl;
+    int first_block = true;
+    for (auto const& i : cache_account) {
+      if (i.second & 0x80000000) {
+        if (first_block == true) {
+          first_block = false;
+        } else {
+          output_file_address_type<<","<<std::endl;
+        }
+        output_file_address_type<<"    \"0x";
+        for (int k = 0; k < 20; ++k) {
+          output_file_address_type<<std::hex<<std::setfill('0')<<std::setw(2)<<(int)addresses[i.first][k];
+        }
+        output_file_address_type<<"\": {\"last\": "<<std::dec<<(i.second^0x80000000)<<", \"type\": "<<addresses_type[i.first]<<"}";
+      }
+    }
+    output_file_address_type<<std::endl<<"  },"<<std::endl;
+    output_file_address_type<<"  \"active\": {"<<std::endl;
+    first_block = true;
+    for (auto const& i : cache_account) {
+      if (!(i.second & 0x80000000)) {
+        if (first_block == true) {
+          first_block = false;
+        } else {
+          output_file_address_type<<","<<std::endl;
+        }
+        output_file_address_type<<"    \"0x";
+        for (int k = 0; k < 20; ++k) {
+          output_file_address_type<<std::hex<<std::setfill('0')<<std::setw(2)<<(int)addresses[i.first][k];
+        }
+        output_file_address_type<<"\": {\"last\": "<<std::dec<<i.second<<", \"type\": "<<addresses_type[i.first]<<"}";
+      }
+    }
+    output_file_address_type<<std::endl<<"  }"<<std::endl;
+    output_file_address_type<<"}"<<std::endl;
+    output_file_address_type.close();
+    ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+    std::cout<<"Saved accounts as "<<output_address_type<<" ("<<ms<<"ms)"<<std::endl;
+  }
+  cache_account.clear();
+
+  ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+  std::cout<<"Writing restorelist output ("<<ms<<"ms)"<<std::endl;
+
   int first_block = true;
   for (auto const& i : restore) {
     if (first_block == true) {
@@ -211,10 +265,9 @@ int run(int from, int to) {
 
 int main(int argc, char **argv) {
   int opt;
-  while ((opt = getopt(argc, argv, "s:e:i:t:o:l:")) != -1) {
+  while ((opt = getopt(argc, argv, "s:e:i:t:o:l:y:")) != -1) {
     switch ( opt ) {
       case 's':
-        std::cout<<optarg<<std::endl;
         block_start = std::stoi(std::string(optarg));
         break;
       case 'e':
@@ -231,6 +284,10 @@ int main(int argc, char **argv) {
         break;
       case 'l':
         log_period = std::stoi(std::string(optarg));
+        break;
+      case 'y':
+        print_address_type = true;
+        output_address_type = std::string(optarg);
         break;
       case '?':
         break;
