@@ -30,10 +30,14 @@ class state {
   state(int address_id, int blocknumber, int8_t type): address_id(address_id), blocknumber(blocknumber), type(type){};
 };
 
+//the restore list
 std::map<int, std::vector<int> > restore;
+//a map to cache the most recent appearance of an account
 std::unordered_map<int, int> cache_account;
+//a map to cache updated account in each block
 std::map<int, std::set<int> > cache_block;
 
+//address id - address map
 std::unordered_map<int, std::array<uint8_t, 20> > addresses;
 std::unordered_map<int, int > addresses_type;
 
@@ -50,18 +54,22 @@ int cnt_inactivated = 0;
 
 bool print_address_type = false;
 
+//update account cache
 void update_account (int address, int blocknumber, int type) {
   if (IS_READ(type)) {
+    //restore inactive account on read
     if (cache_account.contains(address) && IS_INACTIVE(cache_account[address])) {
       restore[blocknumber].push_back(address);
       cnt_restore++;
       cache_account[address] = blocknumber;
     }
   } else if (IS_WRITE(type)) {
+    //restore inactive account on write
     if (cache_account.contains(address) && IS_INACTIVE(cache_account[address])) {
       restore[blocknumber].push_back(address);
       cnt_restore++;
     }
+    //update account cache
     cache_account[address] = blocknumber;
   }
 }
@@ -106,15 +114,18 @@ int run(int32_t from, int32_t to) {
 
     for (int32_t k = 0; k < batch_size; ++k) {
       cache_block[i+k] = std::set<int>();
+      //update accounts
       for (auto const& j : result[k]) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
           if (cache_account.contains(j.address_id)) {
             if (IS_WRITE(j.type) && cache_account[j.address_id] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && IS_ACTIVE(cache_account[j.address_id])) {
+              //erase an existing outdated cache
               cache_block[cache_account[j.address_id]].erase(j.address_id);
             }
           }
           update_account(j.address_id, i+k, j.type);
+          //cache the potentially restorable account
           if (cache_account.contains(j.address_id)) cache_block[i+k].insert(j.address_id);
           cnt_state++;
         } catch (int err) {
@@ -122,12 +133,16 @@ int run(int32_t from, int32_t to) {
         }
       }
 
+      //inactivate accounts
       if ((i+k + 1 - from + epoch_inactivate_older_than) % epoch_inactivate_every == 0) {
+        //iterate over the blocks
         for (int32_t j = epoch_inactivate_every-1; j >= 0; --j) {
           int32_t block_removal = i+k - j - epoch_inactivate_older_than;
           if (block_removal >= 0) {
+            //iterate over block cache to inactivate the accounts
             for (auto const& l : cache_block[block_removal]) {
               if (IS_ACTIVE(cache_account[l]) && cache_account[l] <= i+k - epoch_inactivate_older_than) {
+                //mark as inactivated
                 cache_account[l] = block_removal ^ 0x80000000;
                 cnt_inactivated++;
               }
@@ -136,6 +151,7 @@ int run(int32_t from, int32_t to) {
           }
         }
       }
+      //print logs
       if ((i+k) % log_period == 0) {
         int ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
         std::cout<<"========================================"<<std::endl;
@@ -147,6 +163,7 @@ int run(int32_t from, int32_t to) {
     cnt_block = std::min(cnt_block+batch_size, to);
   }
 
+  //for GC
   std::map<int, std::set<int> >().swap(cache_block);
 
   int ms;
@@ -165,6 +182,7 @@ int run(int32_t from, int32_t to) {
   ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
   std::cout<<"Fetching addresses ("<<ms<<"ms)"<<std::endl;
 
+  //fetch address informations
   for (int i = 0; i < address_cnt; i+=batch_size_address) {
     std::unique_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement("SELECT `id`, `address`, `_type` FROM `addresses` WHERE `id`>=? AND `id`<?;"));
     stmnt->setInt(1, i);
@@ -186,6 +204,7 @@ int run(int32_t from, int32_t to) {
   output_file.open(output_restore);
   output_file<<"{"<<std::endl;
 
+  //write output
   if (print_address_type) {
     ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
     std::cout<<"Writing type output ("<<ms<<"ms)"<<std::endl;
