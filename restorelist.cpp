@@ -16,6 +16,11 @@
 #define db_pass "1234"
 #define db_name "ethereum"
 
+#define IS_WRITE(x) (x & 1)
+#define IS_READ(x) (!(x & 1))
+#define IS_ACTIVE(x) (!(x & 0x80000000))
+#define IS_INACTIVE(x) (x & 0x80000000)
+
 class state {
   public:
   int address_id;
@@ -46,14 +51,14 @@ int cnt_inactivated = 0;
 bool print_address_type = false;
 
 void update_account (int address, int blocknumber, int type) {
-  if (type == 0) {
-    if (cache_account.contains(address) && (cache_account[address] & 0x80000000)) {
+  if (IS_READ(type)) {
+    if (cache_account.contains(address) && IS_INACTIVE(cache_account[address])) {
       restore[blocknumber].push_back(address);
       cnt_restore++;
       cache_account[address] = blocknumber;
     }
-  } else if (type == 1) {
-    if (cache_account.contains(address) && (cache_account[address] & 0x80000000)) {
+  } else if (IS_WRITE(type)) {
+    if (cache_account.contains(address) && IS_INACTIVE(cache_account[address])) {
       restore[blocknumber].push_back(address);
       cnt_restore++;
     }
@@ -61,7 +66,7 @@ void update_account (int address, int blocknumber, int type) {
   }
 }
 
-int run(int from, int to) {
+int run(int32_t from, int32_t to) {
   const int batch_size = 100;
   const int batch_size_address = 10000;
 
@@ -82,7 +87,7 @@ int run(int from, int to) {
 
   auto start = std::chrono::steady_clock::now();
 
-  for (int i = from; i <= to; i += batch_size) {
+  for (int32_t i = from; i <= to; i += batch_size) {
     std::unique_ptr<sql::PreparedStatement> stmnt(conn->prepareStatement("SELECT `address_id`, `blocknumber`, `type` FROM `states` WHERE `blocknumber`>=? AND `blocknumber`<?;"));
     stmnt->setInt(1, i);
     stmnt->setInt(2, std::min(i+batch_size, to+1));
@@ -90,7 +95,7 @@ int run(int from, int to) {
     std::vector<std::vector<state> > result;
 
     result.reserve(batch_size);
-    for (int j = 0; j < batch_size; ++j) result.push_back(std::vector<state>());
+    for (int32_t j = 0; j < batch_size; ++j) result.push_back(std::vector<state>());
 
     query = stmnt->executeQuery();
 
@@ -99,17 +104,17 @@ int run(int from, int to) {
     }
     delete query;
 
-    for (int k = 0; k < batch_size; ++k) {
+    for (int32_t k = 0; k < batch_size; ++k) {
       cache_block[i+k] = std::set<int>();
       for (auto const& j : result[k]) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
           if (cache_account.contains(j.address_id)) {
-            if (j.type & 1 == 1 && cache_account[j.address_id] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && (~(cache_account[j.address_id] & 0x80000000))) {
+            if (IS_WRITE(j.type) && cache_account[j.address_id] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && IS_ACTIVE(cache_account[j.address_id])) {
               cache_block[cache_account[j.address_id]].erase(j.address_id);
             }
           }
-          update_account(j.address_id, i+k, j.type & 1);
+          update_account(j.address_id, i+k, j.type);
           if (cache_account.contains(j.address_id)) cache_block[i+k].insert(j.address_id);
           cnt_state++;
         } catch (int err) {
@@ -118,8 +123,8 @@ int run(int from, int to) {
       }
 
       if ((i+k + 1 - from + epoch_inactivate_older_than) % epoch_inactivate_every == 0) {
-        for (int j = epoch_inactivate_every-1; j >= 0; --j) {
-          int block_removal = i+k - j - epoch_inactivate_older_than;
+        for (int32_t j = epoch_inactivate_every-1; j >= 0; --j) {
+          int32_t block_removal = i+k - j - epoch_inactivate_older_than;
           if (block_removal >= 0) {
             for (auto const& l : cache_block[block_removal]) {
               if (cache_account[l] >= 0 && cache_account[l] <= i+k - epoch_inactivate_older_than) {
