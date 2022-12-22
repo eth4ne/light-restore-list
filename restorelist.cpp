@@ -105,11 +105,11 @@ int run(int from, int to) {
         try {
           if (j.address_id > max_id) max_id = j.address_id;
           if (cache_account.contains(j.address_id)) {
-            if (cache_account[j.address_id] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && (~(cache_account[j.address_id] & 0x80000000))) {
+            if (j.type & 1 == 1 && cache_account[j.address_id] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && (~(cache_account[j.address_id] & 0x80000000))) {
               cache_block[cache_account[j.address_id]].erase(j.address_id);
             }
           }
-          update_account(j.address_id, i+k, j.type % 2);
+          update_account(j.address_id, i+k, j.type & 1);
           if (cache_account.contains(j.address_id)) cache_block[i+k].insert(j.address_id);
           cnt_state++;
         } catch (int err) {
