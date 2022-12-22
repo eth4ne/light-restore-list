@@ -127,7 +127,7 @@ int run(int32_t from, int32_t to) {
           int32_t block_removal = i+k - j - epoch_inactivate_older_than;
           if (block_removal >= 0) {
             for (auto const& l : cache_block[block_removal]) {
-              if (cache_account[l] >= 0 && cache_account[l] <= i+k - epoch_inactivate_older_than) {
+              if (IS_ACTIVE(cache_account[l]) && cache_account[l] <= i+k - epoch_inactivate_older_than) {
                 cache_account[l] = block_removal ^ 0x80000000;
                 cnt_inactivated++;
               }
